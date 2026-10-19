@@ -94,7 +94,7 @@ main{display:grid;grid-template-columns:1fr 300px;gap:16px;padding:16px 20px;pos
 .lane[data-zone=volcan] .l-lava{background:linear-gradient(180deg,#ff520000 52%,#ff2a0033 70%,#ff7a00aa 86%,#ffc04d);animation:lavaPulse 3.2s ease-in-out infinite}
 .lane[data-zone=volcan] .l-ash{background-image:radial-gradient(2px 2px at 15% 92%,#ffb347cc,transparent 60%),radial-gradient(2px 2px at 45% 82%,#ff6a00cc,transparent 60%),radial-gradient(2.5px 2.5px at 75% 94%,#ffcc55cc,transparent 60%),radial-gradient(2px 2px at 30% 70%,#ff8a00aa,transparent 60%);background-size:180px 180px;background-repeat:repeat;opacity:.7;animation:particles 6s linear infinite}
 @keyframes lavaPulse{0%,100%{opacity:.8;filter:brightness(1)}50%{opacity:1;filter:brightness(1.4)}}
-.mon{z-index:4}
+.mon{z-index:6}
 .mon{position:absolute;left:0;top:0;cursor:pointer;user-select:none;will-change:transform;filter:drop-shadow(0 8px 14px #0009) drop-shadow(0 0 14px color-mix(in srgb,var(--c) 60%,transparent))}
 .mon::before{content:'';position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);width:70%;height:14px;background:radial-gradient(closest-side,#000c,transparent);border-radius:50%;z-index:-1}
 .mon .ico{font-size:2.6rem;text-align:center;line-height:1;transition:transform .12s;position:relative;animation:monpulse 2.2s ease-in-out infinite}
@@ -116,7 +116,8 @@ main{display:grid;grid-template-columns:1fr 300px;gap:16px;padding:16px 20px;pos
 .cannon .muzzle{position:absolute;bottom:46px;left:50%;transform:translateX(-50%);width:14px;height:8px;background:var(--volcan);border-radius:2px;opacity:0}
 .cannon.fire .muzzle{animation:mflash .2s}
 @keyframes mflash{0%{opacity:1;transform:translateX(-50%) scale(1.4)}100%{opacity:0;transform:translateX(-50%) scale(.6)}}
-.proj{position:absolute;width:15px;height:15px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fffdf2,#ffb347 45%,#ff3b00 100%);box-shadow:0 0 14px #ff8a00,0 0 32px #ff2a0099,inset 0 0 5px #fff;pointer-events:none;border:1px solid #ffe9a8}
+.proj{position:absolute;width:22px;height:22px;border-radius:50%;z-index:9;background:radial-gradient(circle at 35% 30%,#fffdf2,#ffc24d 38%,#ff6a00 62%,#ff2a00 100%);box-shadow:0 0 16px #ffb347,0 0 40px #ff6a00cc,0 0 80px #ff2a0088,inset 0 0 8px #fff;pointer-events:none;border:2px solid #ffe9a8;animation:projPulse .35s ease-in-out infinite alternate}
+@keyframes projPulse{from{box-shadow:0 0 14px #ffb347,0 0 34px #ff6a00bb,0 0 66px #ff2a0077,inset 0 0 6px #fff}to{box-shadow:0 0 22px #ffd27a,0 0 52px #ff7a00ee,0 0 92px #ff2a00aa,inset 0 0 10px #fff}}
 .expl{position:absolute;pointer-events:none}
 .big-cannon{position:absolute;bottom:-34px;left:50%;transform:translateX(-50%);width:300px;height:236px;pointer-events:none;z-index:6;filter:drop-shadow(0 0 30px #ff2a2a55)}
 .big-cannon .gunner-rig{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);width:200px;z-index:1;pointer-events:none;transform-origin:50% 100%;animation:gunnerBreath 5s ease-in-out infinite}
@@ -344,6 +345,8 @@ body.crit::after{box-shadow:inset 0 0 220px 90px #b3001b99,inset 0 0 60px 24px #
   .big-cannon .crest{font-size:24px;bottom:22px}
   .big-cannon .brake{width:56px;height:26px}
   .muzzle-light{width:240px;height:240px}
+  .proj{width:32px;height:32px}
+  .toast{font-size:.82rem;padding:8px 11px}
 }
 @media(max-width:560px){
   h1{font-size:1.45rem}
@@ -616,6 +619,7 @@ setInterval(() => {
 }, 1700);
 arena.addEventListener('pointermove', (ev) => {
   lastAim = performance.now();
+  aimX = ev.clientX; aimY = ev.clientY;
   const rect = arena.getBoundingClientRect();
   const mx = ev.clientX - rect.left;
   const my = ev.clientY - rect.top;
@@ -655,15 +659,13 @@ arena.addEventListener('pointermove', (ev) => {
   ch.classList.toggle('lock', lock);
 });
 arena.addEventListener('mouseleave', () => { $('#crosshair').style.display = 'none'; arena.classList.remove('aiming'); });
-document.addEventListener('click', (ev) => {
+function fireAt(clientX, clientY){
   if (!document.getElementById('login').hidden) return;
   if (phase !== 'playing') return;
-  const t = ev.target;
-  if (t && t.closest && t.closest('button,input,a,.lane-head')) return;
   const rect = arena.getBoundingClientRect();
-  if (ev.clientX < rect.left || ev.clientX > rect.right || ev.clientY < rect.top || ev.clientY > rect.bottom) return;
-  const mx = ev.clientX - rect.left;
-  const my = ev.clientY - rect.top;
+  if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return;
+  const mx = clientX - rect.left;
+  const my = clientY - rect.top;
   const cx = rect.width / 2;
   const cy = rect.height - 20;
   const dx = mx - cx, dy = my - cy;
@@ -674,7 +676,7 @@ document.addEventListener('click', (ev) => {
     y: cy - 40,
     vx: (dx / len) * speed,
     vy: (dy / len) * speed - 40,
-    r: 9,
+    r: 13,
     born: performance.now(),
     el: null,
   };
@@ -684,6 +686,7 @@ document.addEventListener('click', (ev) => {
   arena.append(pel);
   p.el = pel;
   projectiles.push(p);
+  while (projectiles.length > 90) { const old = projectiles.shift(); if (old.el) old.el.remove(); }
   myShots++;
   const sh = document.getElementById('myShots'); if (sh) sh.textContent = myShots;
   bigCannon.classList.add('fire');
@@ -721,7 +724,32 @@ document.addEventListener('click', (ev) => {
   setTimeout(() => arena.classList.remove('kick'), 130);
   sfx.cannon();
   if (navigator.vibrate) navigator.vibrate(20);
+}
+
+// --- Disparo en ráfaga: mantener pulsado sobre la arena ---
+const FIRE_COOLDOWN = 120;
+let firing = false, fireTimer = null, aimX = 0, aimY = 0;
+arena.addEventListener('pointerdown', (ev) => {
+  if (!document.getElementById('login').hidden) return;
+  if (phase !== 'playing') return;
+  const t = ev.target;
+  if (t && t.closest && t.closest('button,input,a,.lane-head')) return;
+  aimX = ev.clientX; aimY = ev.clientY;
+  firing = true;
+  fireAt(aimX, aimY);
+  if (fireTimer) clearTimeout(fireTimer);
+  const loop = () => {
+    if (!firing) return;
+    fireAt(aimX, aimY);
+    fireTimer = setTimeout(loop, FIRE_COOLDOWN);
+  };
+  fireTimer = setTimeout(loop, FIRE_COOLDOWN);
 });
+const stopFire = () => { firing = false; if (fireTimer) { clearTimeout(fireTimer); fireTimer = null; } };
+const clearProjectiles = () => { for (const p of projectiles) if (p.el) p.el.remove(); projectiles.length = 0; };
+window.addEventListener('pointerup', stopFire);
+window.addEventListener('pointercancel', stopFire);
+window.addEventListener('blur', stopFire);
 
 function renderLanes(){
   for (const key of Object.keys(ZONES)) {
@@ -753,7 +781,9 @@ function log(text){
 }
 
 function toast(text, kind=''){
-  const t = el('div', 'toast ' + kind, text); $('#toasts').append(t);
+  const box = $('#toasts');
+  const t = el('div', 'toast ' + kind, text); box.append(t);
+  while (box.children.length > 3) box.firstChild.remove();
   setTimeout(() => t.remove(), 3500);
 }
 
@@ -1423,7 +1453,7 @@ function handle(m){
     $('#gameoverOverlay').hidden = phase !== 'ended';
     if (phase === 'lobby') {
       for (const id of [...entities.keys()]) removeEntity(id);
-      projectiles.length = 0;
+      stopFire(); clearProjectiles();
       myScore = 0; myHits = 0; myCombo = 0; myShots = 0;
       $('#crosshair').style.display = 'none'; arena.classList.remove('aiming');
       updateComboUI(); updateHUD();
@@ -1441,13 +1471,13 @@ function handle(m){
   } else if (m.type === 'inicio') {
     myScore = 0; myHits = 0; myCombo = 0; myShots = 0;
     for (const id of [...entities.keys()]) removeEntity(id);
-    projectiles.length = 0;
+    stopFire(); clearProjectiles();
     updateComboUI(); updateHUD();
     toast('¡Comienza la cacería!', 'info');
     sfx.start(); sfx.thunder(); sfx.stinger(); startHorror();
   } else if (m.type === 'fin') {
     for (const id of [...entities.keys()]) removeEntity(id);
-    projectiles.length = 0;
+    stopFire(); clearProjectiles();
     myCombo = 0; updateComboUI();
     const defeated = m.reason === 'derrota';
     const winner = defeated ? null : m.ranking[0];
@@ -1498,9 +1528,19 @@ function ensureConnected(){
   ws.onmessage = (ev) => handle(JSON.parse(ev.data));
   ws.onclose = () => { $('#status').textContent = 'Desconectado. Recarga la página.'; toast('Se perdió la conexión con el servidor', 'warn'); };
 }
+function burstFire(n){
+  const r = arena.getBoundingClientRect();
+  const x = r.left + r.width/2, y = r.top + r.height*0.3;
+  fireAt(x, y);
+  let k = 1;
+  const t = setInterval(() => {
+    fireAt(x + (k % 2 ? -16 : 16), y - (k * 4));
+    if (++k >= n) clearInterval(t);
+  }, 95);
+}
 const fireBtn = document.getElementById('fireBtn');
-if (fireBtn) fireBtn.addEventListener('click', (e) => { e.stopPropagation(); const r = arena.getBoundingClientRect(); const ev = new MouseEvent('click', { clientX: r.left + r.width/2, clientY: r.top + r.height*0.3, bubbles: true }); document.dispatchEvent(ev); });
-document.addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); const r = arena.getBoundingClientRect(); const ev = new MouseEvent('click', { clientX: r.left + r.width/2, clientY: r.top + r.height*0.3, bubbles: true }); document.dispatchEvent(ev); } });
+if (fireBtn) fireBtn.addEventListener('click', (e) => { e.stopPropagation(); burstFire(3); });
+document.addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); burstFire(3); } });
 
 // Login: unlock audio + start creepy ambience on first interaction
 const lgEl = document.getElementById('login');
