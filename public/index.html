@@ -119,9 +119,14 @@ main{display:grid;grid-template-columns:1fr 300px;gap:16px;padding:16px 20px;pos
 .proj{position:absolute;width:15px;height:15px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fffdf2,#ffb347 45%,#ff3b00 100%);box-shadow:0 0 14px #ff8a00,0 0 32px #ff2a0099,inset 0 0 5px #fff;pointer-events:none;border:1px solid #ffe9a8}
 .expl{position:absolute;pointer-events:none}
 .big-cannon{position:absolute;bottom:-34px;left:50%;transform:translateX(-50%);width:300px;height:236px;pointer-events:none;z-index:6;filter:drop-shadow(0 0 30px #ff2a2a55)}
-.big-cannon .gunner{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);width:200px;height:auto;z-index:1;pointer-events:none;filter:drop-shadow(0 0 16px #b3001b66) drop-shadow(0 -4px 12px #000)}
+.big-cannon .gunner-rig{position:absolute;left:50%;bottom:26px;transform:translateX(-50%);width:200px;z-index:1;pointer-events:none;transform-origin:50% 100%;animation:gunnerBreath 5s ease-in-out infinite}
+.big-cannon .gunner{display:block;width:100%;height:auto;transform-origin:50% 88%;transition:transform .14s ease-out;filter:drop-shadow(0 0 16px #b3001b66) drop-shadow(0 -4px 12px #000)}
+.big-cannon .gaze{transition:transform .12s ease-out}
 .big-cannon.fire .gunner{animation:gunnerKick .18s}
-@keyframes gunnerKick{0%,100%{transform:translateX(-50%) translateY(0)}30%{transform:translateX(-50%) translateY(4px)}}
+@keyframes gunnerKick{0%,100%{transform:translateY(0)}30%{transform:translateY(5px) scaleY(.985)}}
+@keyframes gunnerBreath{0%,100%{transform:translateX(-50%) translateY(0) scaleY(1)}50%{transform:translateX(-50%) translateY(-3px) scaleY(1.014)}}
+body.crit .big-cannon .gunner-rig{animation:gunnerBreath 5s ease-in-out infinite,gunnerFear .9s ease-in-out infinite}
+@keyframes gunnerFear{0%,100%{transform:translateX(-50%) translateX(0)}25%{transform:translateX(-50%) translateX(-2px)}75%{transform:translateX(-50%) translateX(2px)}}
 .big-cannon .wheel{position:absolute;bottom:-6px;width:70px;height:70px;border-radius:50%;z-index:1;
   background:radial-gradient(circle at 38% 32%,#4a4e57,#20222a 58%,#0a0b0e 90%);border:5px solid #060709;
   box-shadow:inset 0 0 14px #000,0 10px 22px #000c}
@@ -168,7 +173,7 @@ ol{margin:0;padding-left:22px;list-style:none;counter-reset:r}
 #toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:10;max-width:calc(100vw - 32px)}
 .toast{background:var(--text);color:var(--ink);padding:10px 14px;border-radius:10px;font-weight:600;box-shadow:0 6px 20px #0006;animation:pop .2s}
 .toast.win{background:var(--bosque);color:#000}.toast.warn{background:var(--volcan);color:#fff}.toast.info{background:var(--cueva);color:#fff}
-#login{position:fixed;inset:0;background:radial-gradient(1100px 620px at 50% 28%,#2a0710 0%,#12040a 45%,#000 100%);display:grid;place-items:center;z-index:20;padding:20px;overflow:hidden}
+#login{position:fixed;inset:0;background:radial-gradient(1100px 620px at 50% 28%,#2a0710 0%,#12040a 45%,#000 100%);display:grid;place-items:center;align-content:center;z-index:20;padding:20px;overflow-y:auto}
 .login-fog{position:absolute;inset:-20%;pointer-events:none;background:
   radial-gradient(420px 280px at 30% 80%,#b3001b2e,transparent 70%),
   radial-gradient(380px 240px at 72% 30%,#ff2a2a1c,transparent 70%),
@@ -194,6 +199,13 @@ ol{margin:0;padding-left:22px;list-style:none;counter-reset:r}
 #login h1{font-size:3.6rem;line-height:1;font-family:'Creepster',cursive;color:#ff3b3b;text-shadow:0 0 22px #ff2a2a,0 0 52px #b3001b,0 2px 0 #4a0009;text-align:center;margin-top:4px;animation:flicker 4s infinite}
 #login .subtitle{margin:0;color:var(--muted);line-height:1.45;text-align:center;font-size:.92rem}
 #login .hint{margin:0;color:#6b5f5f;line-height:1.3;text-align:center;font-size:.75rem;letter-spacing:1px;font-family:'JetBrains Mono',monospace}
+.login-top{display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono',monospace;font-size:.6rem;letter-spacing:2px;color:#6b5f5f;text-transform:uppercase;margin-bottom:-8px}
+.login-top .live{color:var(--bosque);text-shadow:0 0 10px #3cff8f88;animation:blink 2.4s infinite}
+.login-scan{position:absolute;inset:0;pointer-events:none;z-index:2;opacity:.14;background:repeating-linear-gradient(0deg,#0000 0 2px,#000 2px 3px);mix-blend-mode:multiply}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:4px}
+.step{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 4px;border:1px solid #2a0c14;border-radius:12px;background:linear-gradient(180deg,#ffffff08,#0000);font-family:'JetBrains Mono',monospace}
+.step b{display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:radial-gradient(circle at 38% 30%,#ff5a5a,#8a0012);color:#fff;font-size:.85rem;box-shadow:0 0 12px #b3001b88}
+.step span{font-size:.6rem;letter-spacing:1px;color:var(--muted);text-transform:uppercase;text-align:center}
 #login input{background:#0c0810;border:1px solid #3a0f1a;text-align:center;font-size:1.05rem;letter-spacing:1px}
 #login input:focus{outline:none;border-color:var(--volcan);box-shadow:0 0 18px #ff2a2a55}
 /* SVG skull emblem */
@@ -231,6 +243,7 @@ button.go:active{transform:translateY(1px) scale(.99);box-shadow:0 0 18px #ff2a2
 #combo.show{opacity:1;transform:scale(1.15)}
 .fx{position:fixed;pointer-events:none;z-index:9}
 .particle{position:absolute;width:6px;height:6px;border-radius:50%}
+.smoke{position:absolute;width:22px;height:22px;border-radius:50%;pointer-events:none;z-index:6;will-change:transform,opacity;filter:blur(2px);background:radial-gradient(circle,#d2d2dcbb,#8a8a9544 60%,transparent 72%)}
 .float{position:absolute;font-weight:800;font-size:1.15rem;pointer-events:none;animation:rise 1s ease-out forwards}
 @keyframes pop{from{opacity:0;transform:scale(.92)}}
 @keyframes rise{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-70px)}}
@@ -281,6 +294,35 @@ body.crit::after{box-shadow:inset 0 0 220px 90px #b3001b99,inset 0 0 60px 24px #
 .flicker-glitch{animation:glitchfx .28s steps(2) 1}
 @keyframes glitchfx{0%{filter:none}25%{filter:hue-rotate(20deg) saturate(1.6) contrast(1.3)}50%{transform:translateX(2px);filter:invert(.08)}75%{filter:hue-rotate(-15deg)}100%{filter:none}}
 [hidden]{display:none!important}
+/* ===== AMBIENTE / PARALAJE ===== */
+.lane .decor>div{transition:transform .25s ease-out;will-change:transform}
+.lane .l-far{transform:translateX(calc(var(--px,0px) * .22))}
+.lane .l-mid{transform:translateX(calc(var(--px,0px) * .45))}
+.lane .l-mtn{transform:translateX(calc(var(--px,0px) * .18))}
+.lane .l-ceil{transform:translateX(calc(var(--px,0px) * .3))}
+.lane .l-near{transform:translateX(calc(var(--px,0px) * .8))}
+.lane .l-ground{transform:translateX(calc(var(--px,0px) * .35))}
+.decor .l-fog{opacity:.5;filter:blur(3px);animation:fogDrift 16s ease-in-out infinite alternate}
+.lane[data-zone=bosque] .l-fog{background:radial-gradient(70% 45% at 45% 82%,#7dffb31a,transparent 70%),linear-gradient(180deg,transparent 62%,#06150d66 100%)}
+.lane[data-zone=cueva] .l-fog{background:radial-gradient(75% 50% at 50% 84%,#9b6bff22,transparent 72%)}
+.lane[data-zone=volcan] .l-fog{background:radial-gradient(75% 50% at 50% 84%,#ff6a0022,transparent 72%)}
+@keyframes fogDrift{0%{transform:translateX(-4%) scale(1.02)}100%{transform:translateX(4%) scale(1.08)}}
+.lane .l-fireflies{background-repeat:repeat;background-size:240px 240px;opacity:0;animation:firefly 7s ease-in-out infinite,fireflyFloat 11s linear infinite;
+  background-image:
+    radial-gradient(2px 2px at 18% 72%,#c8ff9e,transparent 60%),
+    radial-gradient(2px 2px at 42% 58%,#a8ff8f,transparent 60%),
+    radial-gradient(1.6px 1.6px at 66% 78%,#d6ffa8,transparent 60%),
+    radial-gradient(2px 2px at 82% 52%,#7dffb3,transparent 60%),
+    radial-gradient(1.5px 1.5px at 30% 44%,#b6ffa0,transparent 60%)}
+.lane.on .l-fireflies{opacity:.9}
+@keyframes firefly{0%,100%{filter:brightness(.7)}50%{filter:brightness(1.8) drop-shadow(0 0 6px #7dffb3)}}
+@keyframes fireflyFloat{0%{background-position:0 0}100%{background-position:0 -240px}}
+.lane .l-glow{background:radial-gradient(55% 38% at 50% 100%,#9b6bff55,transparent 72%);animation:glowPulse 4.5s ease-in-out infinite;opacity:.8}
+@keyframes glowPulse{0%,100%{opacity:.55;filter:brightness(1)}50%{opacity:.95;filter:brightness(1.4)}}
+.lane .l-drips{background-repeat:repeat;background-size:34px 78px;opacity:.32;animation:drip 5s linear infinite;
+  background-image:repeating-linear-gradient(180deg,transparent 0 38px,#b98cff26 38px 40px,transparent 40px 78px);
+  mask-image:linear-gradient(180deg,transparent,#000 30%,#000 80%,transparent)}
+@keyframes drip{0%{background-position:0 0}100%{background-position:0 78px}}
 .arena{touch-action:manipulation}
 @media(max-width:1024px){main{grid-template-columns:1fr;padding:12px}.arena{grid-template-columns:1fr;gap:12px}aside{order:2}}
 @media(max-width:900px){
@@ -293,7 +335,7 @@ body.crit::after{box-shadow:inset 0 0 220px 90px #b3001b99,inset 0 0 60px 24px #
   .field{height:clamp(300px,50vh,460px)}
   #toasts{top:auto;bottom:12px;right:12px;left:12px;max-width:none}
   .big-cannon{width:220px;height:174px;bottom:-24px}
-  .big-cannon .gunner{width:150px;bottom:20px}
+  .big-cannon .gunner-rig{width:150px;bottom:20px}
   .big-cannon .barrel{width:42px;height:128px;margin-left:-21px;bottom:64px}
   .big-cannon .wheel{width:52px;height:52px}
   .big-cannon .wheel::after{inset:16px}
@@ -311,7 +353,7 @@ body.crit::after{box-shadow:inset 0 0 220px 90px #b3001b99,inset 0 0 60px 24px #
   .hud .chip{font-size:.68rem;padding:4px 7px}
   #timer{font-size:1.05rem}
   .big-cannon{width:168px;height:140px;bottom:-18px}
-  .big-cannon .gunner{width:118px;bottom:16px}
+  .big-cannon .gunner-rig{width:118px;bottom:16px}
   .big-cannon .barrel{width:34px;height:100px;margin-left:-17px;bottom:52px}
   .big-cannon .wheel{width:42px;height:42px}
   .big-cannon .base{width:124px;height:48px}
@@ -347,7 +389,9 @@ body.crit::after{box-shadow:inset 0 0 220px 90px #b3001b99,inset 0 0 60px 24px #
   <div class="login-bats">
     <span>🦇</span><span>🦇</span><span>🦇</span><span>🦇</span><span>🦇</span>
   </div>
+  <div class="login-scan"></div>
   <form id="loginForm">
+    <div class="login-top"><span class="live">● EN LÍNEA</span><span class="ver">RABBITMQ · 3 ZONAS</span></div>
     <div class="emblem">
       <svg class="skull-svg" viewBox="0 0 220 270" aria-hidden="true">
         <defs>
@@ -409,7 +453,12 @@ body.crit::after{box-shadow:inset 0 0 220px 90px #b3001b99,inset 0 0 60px 24px #
     <p class="subtitle">Multijugador sobre RabbitMQ. Dispara el cañón central, caza monstruos y vence a tus rivales.</p>
     <input id="nameInput" maxlength="16" placeholder="Escribe tu nombre…" autocomplete="off" required>
     <button class="go">⚔ Entrar a la cacería</button>
-    <p class="hint">3 zonas · 8 cazadores · 60 segundos</p>
+    <p class="hint">3 zonas · hasta 8 cazadores · duración configurable</p>
+    <div class="steps">
+      <div class="step"><b>1</b><span>Elige zonas</span></div>
+      <div class="step"><b>2</b><span>Apunta</span></div>
+      <div class="step"><b>3</b><span>Dispara</span></div>
+    </div>
   </form>
 </div>
 
@@ -504,9 +553,9 @@ for (const [key, label] of Object.entries(ZONES)) {
   head.onclick = () => ws && ws.send(JSON.stringify({ type:'zona', zone:key, on: !listening.has(key) }));
   const field = el('div', 'field'); field.id = 'field-' + key;
   const decor = el('div', 'decor');
-  if (key === 'bosque') decor.innerHTML = '<div class="l-sky"></div><div class="l-far"></div><div class="l-mid"></div><div class="l-near"></div><div class="l-ground"></div>';
-  else if (key === 'cueva') decor.innerHTML = '<div class="l-sky"></div><div class="l-far"></div><div class="l-ceil"></div><div class="l-near"></div><div class="l-mist"></div>';
-  else decor.innerHTML = '<div class="l-sky"></div><div class="l-mtn"></div><div class="l-far"></div><div class="l-lava"></div><div class="l-near"></div><div class="l-ash"></div>';
+  if (key === 'bosque') decor.innerHTML = '<div class="l-sky"></div><div class="l-far"></div><div class="l-mid"></div><div class="l-near"></div><div class="l-ground"></div><div class="l-fog"></div><div class="l-fireflies"></div>';
+  else if (key === 'cueva') decor.innerHTML = '<div class="l-sky"></div><div class="l-far"></div><div class="l-glow"></div><div class="l-ceil"></div><div class="l-near"></div><div class="l-drips"></div><div class="l-mist"></div><div class="l-fog"></div>';
+  else decor.innerHTML = '<div class="l-sky"></div><div class="l-mtn"></div><div class="l-far"></div><div class="l-lava"></div><div class="l-near"></div><div class="l-ash"></div><div class="l-fog"></div>';
   field.append(decor);
   const empty = el('div', 'empty', 'SIN SEÑAL. Toca el título para despertar esta zona.');
   lane.append(head, field, empty);
@@ -516,6 +565,7 @@ for (const [key, label] of Object.entries(ZONES)) {
 // Big central cannon
 const bigCannon = el('div', 'big-cannon');
 bigCannon.innerHTML = `
+  <div class="gunner-rig">
   <svg class="gunner" viewBox="0 0 150 230" aria-hidden="true">
     <defs>
       <linearGradient id="cloak" x1="0" y1="0" x2="0" y2="1">
@@ -529,12 +579,13 @@ bigCannon.innerHTML = `
     <path d="M110 118 C126 132 136 150 140 168" stroke="#1a1020" stroke-width="14" stroke-linecap="round" fill="none"/>
     <path d="M75 8 C46 8 30 34 30 62 C30 78 34 90 40 100 C30 108 16 124 12 150 C6 186 8 214 8 226 L142 226 C142 214 144 186 138 150 C134 124 120 108 110 100 C116 90 120 78 120 62 C120 34 104 8 75 8 Z" fill="url(#cloak)" stroke="#3a2440" stroke-width="1.5"/>
     <ellipse cx="75" cy="66" rx="34" ry="40" fill="url(#voidg)"/>
-    <g filter="url(#gglow)">
+    <g class="gaze" filter="url(#gglow)">
       <ellipse class="eyeglow" cx="63" cy="66" rx="5.5" ry="4" fill="url(#geye)"/>
       <ellipse class="eyeglow" cx="87" cy="66" rx="5.5" ry="4" fill="url(#geye)"/>
     </g>
     <path d="M40 100 C58 112 92 112 110 100 C104 116 46 116 40 100 Z" fill="#0a0410" opacity="0.8"/>
   </svg>
+  </div>
   <div class="wheel left"></div><div class="wheel right"></div>
   <div class="base"></div>
   <div class="mount"></div>
@@ -554,7 +605,17 @@ arena.append(aimLine, muzzleLight);
 
 // Global aim + fire over the whole arena
 let aimAngle = -90;
+let lastAim = 0;
+setInterval(() => {
+  if (phase !== 'playing' || performance.now() - lastAim < 2600) return;
+  const g = bigCannon.querySelector('.gaze');
+  const gn = bigCannon.querySelector('.gunner');
+  const dir = (Math.random() - .5) * 2;
+  if (g) g.style.transform = `translate(${(dir * 3).toFixed(2)}px,0)`;
+  if (gn) gn.style.transform = `rotate(${(dir * 2.4).toFixed(2)}deg)`;
+}, 1700);
 arena.addEventListener('pointermove', (ev) => {
+  lastAim = performance.now();
   const rect = arena.getBoundingClientRect();
   const mx = ev.clientX - rect.left;
   const my = ev.clientY - rect.top;
@@ -566,6 +627,14 @@ arena.addEventListener('pointermove', (ev) => {
   if (a < -175) a = -175;
   aimAngle = a;
   bigCannon.querySelector('.barrel').style.transform = `rotate(${a + 90}deg)`;
+  const gunner = bigCannon.querySelector('.gunner');
+  if (gunner) gunner.style.transform = `rotate(${((a + 90) * 0.055).toFixed(2)}deg)`;
+  const gaze = bigCannon.querySelector('.gaze');
+  if (gaze) gaze.style.transform = `translate(${(Math.cos(a * Math.PI / 180) * 3.2).toFixed(2)}px,${(Math.sin(a * Math.PI / 180) * 1.4).toFixed(2)}px)`;
+  document.querySelectorAll('.lane').forEach((l) => {
+    const lr = l.getBoundingClientRect();
+    l.style.setProperty('--px', ((ev.clientX - (lr.left + lr.width / 2)) * 0.05).toFixed(2) + 'px');
+  });
   // aim guide
   const dx = mx - cx, dy = my - oy;
   arena.classList.add('aiming');
@@ -589,7 +658,8 @@ arena.addEventListener('mouseleave', () => { $('#crosshair').style.display = 'no
 document.addEventListener('click', (ev) => {
   if (!document.getElementById('login').hidden) return;
   if (phase !== 'playing') return;
-  if (ev.target.closest('button,input,a,.lane-head')) return;
+  const t = ev.target;
+  if (t && t.closest && t.closest('button,input,a,.lane-head')) return;
   const rect = arena.getBoundingClientRect();
   if (ev.clientX < rect.left || ev.clientX > rect.right || ev.clientY < rect.top || ev.clientY > rect.bottom) return;
   const mx = ev.clientX - rect.left;
@@ -623,6 +693,29 @@ document.addEventListener('click', (ev) => {
   muzzleLight.style.left = (cx + Math.cos(rad) * 175) + 'px';
   muzzleLight.style.top = (cy + Math.sin(rad) * 175) + 'px';
   muzzleLight.classList.remove('on'); void muzzleLight.offsetWidth; muzzleLight.classList.add('on');
+  // gunpowder smoke
+  for (let i = 0; i < 6; i++) {
+    const s = document.createElement('div');
+    s.className = 'smoke';
+    const bx = cx + Math.cos(rad) * (168 + i * 4);
+    const by = cy + Math.sin(rad) * (168 + i * 4);
+    s.style.left = bx + 'px'; s.style.top = by + 'px';
+    arena.append(s);
+    const ang = rad + (Math.random() - .5) * 0.8;
+    const sp = 18 + Math.random() * 46;
+    let sx = 0, sy = 0, vx = Math.cos(ang) * sp, vy = Math.sin(ang) * sp - 22;
+    const start = performance.now(), dur = 700 + Math.random() * 450;
+    let prev = start;
+    (function st(now){
+      const dt = (now - prev) / 1000; prev = now;
+      if (now - start > dur) { s.remove(); return; }
+      vy -= 28 * dt; sx += vx * dt; sy += vy * dt;
+      s.style.transform = `translate(-50%,-50%) translate(${sx}px,${sy}px) scale(${(1 + (now - start) / dur * 1.9).toFixed(2)})`;
+      s.style.opacity = String(0.5 * (1 - (now - start) / dur));
+      requestAnimationFrame(st);
+    })(start);
+  }
+  if (navigator.vibrate) navigator.vibrate(8);
   // camera kick
   arena.classList.remove('kick'); void arena.offsetWidth; arena.classList.add('kick');
   setTimeout(() => arena.classList.remove('kick'), 130);
