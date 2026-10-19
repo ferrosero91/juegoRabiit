@@ -170,7 +170,7 @@ ol{margin:0;padding-left:22px;list-style:none;counter-reset:r}
 .rank li span{margin-left:auto;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:.78rem}
 .bind{font-size:.85rem;color:var(--muted);line-height:1.5}.bind b{color:var(--text)}
 .log{font-size:.78rem;color:var(--muted);line-height:1.45;max-height:140px;overflow:auto}
-#toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:10;max-width:calc(100vw - 32px)}
+#toasts{position:fixed;right:332px;bottom:16px;display:flex;flex-direction:column;gap:8px;align-items:flex-end;z-index:10;max-width:min(340px,42vw);pointer-events:none}
 .toast{background:var(--text);color:var(--ink);padding:10px 14px;border-radius:10px;font-weight:600;box-shadow:0 6px 20px #0006;animation:pop .2s}
 .toast.win{background:var(--bosque);color:#000}.toast.warn{background:var(--volcan);color:#fff}.toast.info{background:var(--cueva);color:#fff}
 #login{position:fixed;inset:0;background:radial-gradient(1100px 620px at 50% 28%,#2a0710 0%,#12040a 45%,#000 100%);display:grid;place-items:center;align-content:center;z-index:20;padding:20px;overflow-y:auto}
