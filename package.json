@@ -1,0 +1,12 @@
+{
+  "name": "caceria-rabbit",
+  "version": "1.0.0",
+  "description": "Juego multijugador sencillo con RabbitMQ (exchange direct)",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "dependencies": {
+    "amqplib": "^0.10.4",
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  }
+}
