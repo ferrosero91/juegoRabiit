@@ -12,6 +12,11 @@ services:
         condition: service_started
     expose:
       - "3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/version"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     networks:
       - default
       - dokploy-network

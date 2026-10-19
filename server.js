@@ -1,11 +1,14 @@
 const express = require('express');
 const http = require('http');
+const fs = require('fs');
 const path = require('path');
 const amqp = require('amqplib');
 const { WebSocketServer } = require('ws');
 
 const AMQP_URL = process.env.AMQP_URL || 'amqp://guest:guest@localhost:5672';
 const PORT = process.env.PORT || 3000;
+const BUILD = process.env.BUILD
+  || (() => { try { return fs.readFileSync(path.join(__dirname, 'BUILD'), 'utf8').trim(); } catch { return new Date().toISOString(); } })();
 const MAX_PLAYERS = 8;
 const MATCH_MS = 60000;
 const MIN_MATCH_MS = 15000;
@@ -245,7 +248,7 @@ function scheduleReconnect() {
 
 async function connectRabbit() {
   try {
-    const conn = await amqp.connect(AMQP_URL);
+    const conn = await amqp.connect(AMQP_URL, { heartbeat: 10 });
     conn.on('error', (e) => console.error('RabbitMQ error:', e.message));
     conn.on('close', () => { if (ch) ch = null; scheduleReconnect(); });
     const channel = await conn.createChannel();
@@ -263,9 +266,19 @@ async function connectRabbit() {
 
 async function main() {
   const app    = express();
+  app.disable('etag');
+  app.use((req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    next();
+  });
+  app.get('/version', (_req, res) => res.json({ build: BUILD, uptime: Math.round(process.uptime()) }));
   app.use(express.static(path.join(__dirname, 'public'), {
+    etag: false,
+    lastModified: false,
     setHeaders: (res, filePath) => {
-      if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     },
   }));
   const server = http.createServer(app);
@@ -365,7 +378,7 @@ async function main() {
     });
   });
 
-  server.listen(PORT, () => console.log(`🎮 Servidor en http://localhost:${PORT}`));
+  server.listen(PORT, () => console.log(`🎮 Servidor en http://0.0.0.0:${PORT} · build ${BUILD}`));
   connectRabbit();
 }
 

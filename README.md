@@ -74,3 +74,15 @@ Variables de entorno:
 - **No** mapees `ports` al host (usamos `expose`); el dominio usa el puerto 3000.
 - La app escucha en `0.0.0.0` (Express por defecto), no en `127.0.0.1`.
 - Si usas la pestaña Domains de Dokploy, cada cambio requiere **redeploy**.
+
+### Caché y verificación de despliegue
+
+- El servidor envía `Cache-Control: no-store, no-cache, must-revalidate` + `Pragma: no-cache`
+  + `Expires: 0` en **todas** las respuestas, y desactiva `ETag`/`Last-Modified`, para que
+  el navegador nunca sirva un `index.html` viejo.
+- Si aun así ves caché en producción, suele ser un **CDN/proxy delante** (p. ej. Cloudflare):
+  purga la caché del dominio o ponlo en modo *Development*.
+- Verifica qué build está sirviendo el contenedor en `GET /version`:
+  `{"build":"...","uptime":...}`. El `build` también aparece en el log de arranque.
+- Tras `git push`, entra a Dokploy y pulsa **Redeploy** (o activa *Auto Deploy* con webhook)
+  para reconstruir la imagen; si no, seguirás viendo el build anterior.
