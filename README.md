@@ -9,7 +9,11 @@ Juego multijugador de cacería (3 zonas: bosque, cueva y volcán) usando **Node.
 
 ## Ejecución local (Docker)
 
+El compose usa la red externa `dokploy-network` (la que usa Traefik en Dokploy).
+Para probar en local, créala una vez:
+
 ```bash
+docker network create dokploy-network 2>/dev/null || true
 docker compose up -d --build
 ```
 
@@ -39,12 +43,16 @@ Variables de entorno:
 1. Crea una aplicación de tipo **Docker Compose** y conecta este repositorio
    (`https://github.com/ferrosero91/juegoRabiit.git`), rama `main`.
 2. Selecciona el archivo `docker-compose.yml` (raíz del repo).
-3. En **Domains**, agrega un dominio y apóntalo al servicio **app**, puerto **3000**.
-   Dokploy inyecta las etiquetas de Traefik automáticamente; el WebSocket (`wss`)
-   funciona porque el cliente usa `location.host` y detecta `https`.
-4. Despliega. La app espera a que RabbitMQ arranque (`depends_on`) y se conecta
-   por la red interna del compose vía `amqp://guest:guest@rabbitmq:5672`.
-5. (Opcional) Para exponer el panel de RabbitMQ, crea un dominio adicional
-   apuntando al servicio **rabbitmq**, puerto **15672**.
+3. En **Domains**, agrega un dominio apuntando al servicio **app**, puerto **3000**.
+   El WebSocket (`wss`) funciona porque el cliente usa `location.host` y detecta `https`.
+4. **Redespliega** tras configurar el dominio (los compose solo aplican cambios de
+   dominio al recrear el contenedor).
+5. (Opcional) Dominio adicional al servicio **rabbitmq**, puerto **15672** para el panel.
 
-> No hace falta definir red manual: Dokploy conecta los servicios a su red de Traefik.
+### Puntos críticos de Dokploy
+
+- El servicio **app** va en la red **`dokploy-network`** (ya configurado). Si Traefik
+  no ve el contenedor, la app carga pero da **502/404** aunque esté viva.
+- **No** mapees `ports` al host (usamos `expose`); el dominio usa el puerto 3000.
+- La app escucha en `0.0.0.0` (Express por defecto), no en `127.0.0.1`.
+- Si usas la pestaña Domains de Dokploy, cada cambio requiere **redeploy**.

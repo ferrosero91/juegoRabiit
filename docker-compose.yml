@@ -12,6 +12,11 @@ services:
         condition: service_started
     expose:
       - "3000"
+    networks:
+      - default
+      - dokploy-network
+    labels:
+      - "traefik.docker.network=dokploy-network"
 
   rabbitmq:
     image: rabbitmq:3-management
@@ -27,3 +32,10 @@ services:
       interval: 15s
       timeout: 10s
       retries: 5
+    networks:
+      - default
+
+networks:
+  default:
+  dokploy-network:
+    external: true
