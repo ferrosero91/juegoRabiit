@@ -48,6 +48,7 @@ const hits = new Map();
 let nextId = 1;
 let ch = null;
 let reconnectTimer = null;
+let connecting = false;
 let roomCapacity = MAX_PLAYERS;
 let matchMs = MATCH_MS;
 let autoRounds = false;
@@ -247,6 +248,14 @@ async function rebindPlayers(channel) {
   }
 }
 
+// Cancela el consumidor y elimina la cola exclusiva del jugador (evita fugas en RabbitMQ).
+async function removePlayer(ws, p) {
+  players.delete(ws);
+  if (!p || !ch) return;
+  if (p.tag) { try { await ch.cancel(p.tag); } catch {} }
+  if (p.queue) { try { await ch.deleteQueue(p.queue); } catch {} }
+}
+
 function scheduleReconnect() {
   if (reconnectTimer) return;
   console.error('RabbitMQ no disponible. Reintentando en 3s...');
@@ -257,6 +266,8 @@ function scheduleReconnect() {
 }
 
 async function connectRabbit() {
+  if (connecting) return;
+  connecting = true;
   try {
     const conn = await amqp.connect(AMQP_URL, { heartbeat: 10 });
     conn.on('error', (e) => console.error('RabbitMQ error:', e.message));
@@ -271,6 +282,8 @@ async function connectRabbit() {
   } catch (e) {
     console.error('No se pudo conectar a RabbitMQ:', e.message);
     scheduleReconnect();
+  } finally {
+    connecting = false;
   }
 }
 
@@ -310,22 +323,28 @@ async function main() {
             ws.close(); return;
           }
           joining++;
-          const name = String(msg.name || '').trim().slice(0, 16) || 'Jugador' + Math.floor(Math.random() * 100);
-          const channel = ch;
-          const { queue } = await channel.assertQueue('', { exclusive: true, autoDelete: true });
-          p = { name, queue, zones: new Set(Object.keys(ZONES)), combo: 0, lastHit: 0 };
-          await Promise.all([...p.zones].map((z) => channel.bindQueue(queue, 'monstruos', z)));
-          players.set(ws, p);
-          joining = Math.max(0, joining - 1);
-          if (!scores.has(name)) scores.set(name, 0);
-          if (!hits.has(name))   hits.set(name, 0);
-          const { consumerTag } = await consumePlayer(channel, ws, queue);
-          p.tag = consumerTag;
-          const host = hostOf();
-          send(ws, { type: 'bienvenida', name, queue, zones: [...p.zones], ranking: ranking(), maxPlayers: roomCapacity, duration: matchMs, host: host ? host.name : name, isHost: host === p });
-          broadcast({ type: 'aviso', text: `${name} se unió (${players.size}/${roomCapacity})` });
-          broadcastState();
-          scheduleLobby();
+          try {
+            const channel = ch;
+            const name = String(msg.name || '').trim().slice(0, 16) || 'Jugador' + Math.floor(Math.random() * 100);
+            const { queue } = await channel.assertQueue('', { exclusive: true, autoDelete: true });
+            const np = { name, queue, zones: new Set(Object.keys(ZONES)), combo: 0, lastHit: 0 };
+            await Promise.all([...np.zones].map((z) => channel.bindQueue(queue, 'monstruos', z)));
+            players.set(ws, np);
+            if (!scores.has(name)) scores.set(name, 0);
+            if (!hits.has(name))   hits.set(name, 0);
+            const { consumerTag } = await consumePlayer(channel, ws, queue);
+            np.tag = consumerTag;
+            p = np;
+            const host = hostOf();
+            send(ws, { type: 'bienvenida', name, queue, zones: [...np.zones], ranking: ranking(), maxPlayers: roomCapacity, duration: matchMs, host: host ? host.name : name, isHost: host === np });
+            broadcast({ type: 'aviso', text: `${name} se unió (${players.size}/${roomCapacity})` });
+            broadcastState();
+            scheduleLobby();
+          } catch (e) {
+            console.error('unirse:', e.message);
+          } finally {
+            joining = Math.max(0, joining - 1);
+          }
 
         } else if (p && msg.type === 'config') {
           if (p !== hostOf()) { send(ws, { type: 'aviso', text: 'Solo el anfitrión puede cambiar la configuración' }); return; }
@@ -339,8 +358,7 @@ async function main() {
                 const keep = new Set([...players.keys()].slice(0, roomCapacity));
                 for (const [kws, kp] of [...players]) {
                   if (keep.has(kws)) continue;
-                  players.delete(kws);
-                  if (ch && kp.tag) { try { ch.cancel(kp.tag); } catch {} }
+                  await removePlayer(kws, kp);
                   send(kws, { type: 'lleno', maxPlayers: roomCapacity });
                   kws.close();
                 }
@@ -371,16 +389,14 @@ async function main() {
           const y = Number(msg.y);
           ch.publish('acciones', 'golpe', Buffer.from(JSON.stringify({ id, player: p.name, y: Number.isFinite(y) ? y : 1 })));
         }
-      } catch (e) {
-        console.error(e.message);
-        if (!p) joining = Math.max(0, joining - 1);
-      }
+        } catch (e) {
+          console.error(e.message);
+        }
     });
 
     ws.on('close', async () => {
       if (!p) { joining = Math.max(0, joining - 1); return; }
-      players.delete(ws);
-      if (ch && p.tag) { try { await ch.cancel(p.tag); } catch {} }
+      await removePlayer(ws, p);
       broadcast({ type: 'aviso', text: `${p.name} salió de la partida` });
       broadcastState();
       if (players.size === 0) resetToLobby();

@@ -49,6 +49,29 @@ npm start                       # http://localhost:3000
 - Los timers de expiración de monstruos se limpian al terminar la partida.
 - Soportado hasta `MAX_PLAYERS = 8` jugadores simultáneos.
 
+## Verificación de RabbitMQ
+
+Con el servidor y RabbitMQ corriendo en local (con el puerto 15672 mapeado), ejecuta:
+
+```bash
+npm run test:rabbit
+```
+
+Comprueba automáticamente, contra la API de management y el broker real:
+
+1. Los exchanges `monstruos` y `acciones` existen y son `direct`; `acciones` enlaza
+   `golpes` con routing key `golpe`.
+2. Cada jugador obtiene una **cola exclusiva** distinta enlazada a sus zonas.
+3. Enrutamiento `direct` por zona: solo llega lo de las zonas enlazadas (y a cada cola
+   una sola copia).
+4. Desenlazar una zona (`zona off`) actualiza el binding y deja de recibir esa zona.
+5. La cola exclusiva del jugador se **elimina** al desconectarse (sin fugas).
+6. `acciones`/`golpes`: varios golpes simultáneos al mismo monstruo → **un solo** `derrotado`
+   (first-arrive-wins, sin doble conteo).
+7. **Reconexión real**: reinicia el contenedor de RabbitMQ y verifica que el servidor
+   reconecta, re-vincula al jugador y este sigue recibiendo monstruos.
+
+
 ### Configuración de sala (anfitrión)
 
 El primer jugador que entra es el **anfitrión**. Desde la sala de espera puede elegir:
