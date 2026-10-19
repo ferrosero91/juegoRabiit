@@ -41,6 +41,8 @@ const alive = new Map();
 const scores = new Map();
 const hits = new Map();
 let nextId = 1;
+let ch = null;
+let reconnectTimer = null;
 
 let phase = 'lobby';
 let health = MAX_HEALTH;
@@ -50,6 +52,7 @@ let endTimer = null;
 let countdownTimer = null;
 let lobbyTimer = null;
 let tickTimer = null;
+const ttlTimers = new Set();
 
 const send = (ws, msg) => ws.readyState === 1 && ws.send(JSON.stringify(msg));
 const broadcast = (msg) => players.forEach((_, ws) => send(ws, msg));
@@ -63,6 +66,8 @@ function clearTimers() {
   if (countdownTimer){ clearTimeout(countdownTimer);countdownTimer= null; }
   if (lobbyTimer)    { clearTimeout(lobbyTimer);    lobbyTimer    = null; }
   if (tickTimer)     { clearInterval(tickTimer);    tickTimer     = null; }
+  ttlTimers.forEach((t) => clearTimeout(t));
+  ttlTimers.clear();
 }
 
 function broadcastState() {
@@ -106,7 +111,8 @@ function spawnMonster() {
   const ttl = monsterTTL();
   const monster = { id: nextId++, zone, ...base, ttl };
   alive.set(monster.id, { ...monster, hp: base.hp, maxHp: base.hp });
-  setTimeout(() => {
+  const ttlTimer = setTimeout(() => {
+    ttlTimers.delete(ttlTimer);
     if (alive.has(monster.id) && phase === 'playing') {
       alive.delete(monster.id);
       const damage = Math.max(3, Math.round(6 * (monster.size || 1)));
@@ -116,6 +122,7 @@ function spawnMonster() {
       broadcastState();
     }
   }, ttl + 300);
+  ttlTimers.add(ttlTimer);
   broadcast({ type: 'monstruo', monster });
   spawnTimer = setTimeout(spawnMonster, spawnInterval());
 }
@@ -155,46 +162,96 @@ function resetToLobby() {
   scheduleLobby();
 }
 
-async function main() {
-  const conn = await amqp.connect(AMQP_URL);
-  const ch   = await conn.createChannel();
+function handleGolpe(channel, msg) {
+  if (!msg) return;
+  let data;
+  try { data = JSON.parse(msg.content.toString()); } catch { try { channel.ack(msg); } catch {} return; }
+  try { channel.ack(msg); } catch {}
+  const { player } = data;
+  const id = Number(data.id);
+  if (!Number.isFinite(id) || !player) return;
+  const p = [...players.values()].find((x) => x.name === player);
+  if (!p) return;
+  const monster = alive.get(id);
+  if (!monster) return;
 
-  await ch.assertExchange('monstruos', 'direct', { durable: false });
-  await ch.assertExchange('acciones',  'direct', { durable: false });
-  await ch.assertQueue('golpes', { durable: false });
-  await ch.bindQueue('golpes', 'acciones', 'golpe');
+  monster.hp -= 1;
+  if (monster.hp > 0) {
+    broadcast({ type: 'golpe_ok', id, hp: monster.hp, maxHp: monster.maxHp });
+    return;
+  }
+  alive.delete(id);
+  const now = Date.now();
+  if (now - (p.lastHit || 0) <= COMBO_WINDOW_MS) p.combo = (p.combo || 0) + 1;
+  else p.combo = 1;
+  p.lastHit = now;
+  const mult = Math.min(p.combo, 5);
+  const yf   = Number.isFinite(Number(data.y)) ? Math.min(1, Math.max(0, Number(data.y))) : 1;
+  const heightMult = Math.round((1 + (1 - yf) * 2) * 10) / 10;
+  const gained = Math.round(monster.points * mult * heightMult);
+  scores.set(player, (scores.get(player) || 0) + gained);
+  hits.set(player,   (hits.get(player)   || 0) + 1);
+  broadcast({ type: 'derrotado', id, by: player, monster, gained, combo: p.combo, mult, heightMult, ranking: ranking() });
+}
 
-  await ch.consume('golpes', (msg) => {
-    if (!msg) return;
-    let data;
-    try { data = JSON.parse(msg.content.toString()); } catch { ch.ack(msg); return; }
-    ch.ack(msg);
-    const { id, player } = data;
-    if (!Number.isFinite(id) || !player) return;
-    const p = [...players.values()].find((x) => x.name === player);
-    if (!p) return;
-    const monster = alive.get(id);
-    if (!monster) return;
-
-    monster.hp -= 1;
-    if (monster.hp > 0) {
-      broadcast({ type: 'golpe_ok', id, hp: monster.hp, maxHp: monster.maxHp });
-      return;
-    }
-    alive.delete(id);
-    const now = Date.now();
-    if (now - (p.lastHit || 0) <= COMBO_WINDOW_MS) p.combo = (p.combo || 0) + 1;
-    else p.combo = 1;
-    p.lastHit = now;
-    const mult = Math.min(p.combo, 5);
-    const yf   = Number.isFinite(Number(data.y)) ? Math.min(1, Math.max(0, Number(data.y))) : 1;
-    const heightMult = Math.round((1 + (1 - yf) * 2) * 10) / 10;
-    const gained = Math.round(monster.points * mult * heightMult);
-    scores.set(player, (scores.get(player) || 0) + gained);
-    hits.set(player,   (hits.get(player)   || 0) + 1);
-    broadcast({ type: 'derrotado', id, by: player, monster, gained, combo: p.combo, mult, heightMult, ranking: ranking() });
+function consumePlayer(channel, ws, queue) {
+  return channel.consume(queue, (m) => {
+    if (!m) return;
+    try { channel.ack(m); } catch {}
+    send(ws, { type: 'monstruo', monster: JSON.parse(m.content.toString()) });
   });
+}
 
+async function setupChannel(channel) {
+  await channel.assertExchange('monstruos', 'direct', { durable: false });
+  await channel.assertExchange('acciones',  'direct', { durable: false });
+  await channel.assertQueue('golpes', { durable: false });
+  await channel.bindQueue('golpes', 'acciones', 'golpe');
+  await channel.consume('golpes', (msg) => handleGolpe(channel, msg));
+}
+
+async function rebindPlayers(channel) {
+  for (const [ws, p] of players) {
+    try {
+      const { queue } = await channel.assertQueue('', { exclusive: true, autoDelete: true });
+      p.queue = queue;
+      await Promise.all([...p.zones].map((z) => channel.bindQueue(queue, 'monstruos', z)));
+      const { consumerTag } = await consumePlayer(channel, ws, queue);
+      p.tag = consumerTag;
+    } catch (e) {
+      console.error(`No se pudo re-vincular a ${p && p.name}:`, e.message);
+    }
+  }
+}
+
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+  console.error('RabbitMQ no disponible. Reintentando en 3s...');
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    connectRabbit();
+  }, 3000);
+}
+
+async function connectRabbit() {
+  try {
+    const conn = await amqp.connect(AMQP_URL);
+    conn.on('error', (e) => console.error('RabbitMQ error:', e.message));
+    conn.on('close', () => { if (ch) ch = null; scheduleReconnect(); });
+    const channel = await conn.createChannel();
+    channel.on('error', (e) => console.error('Canal error:', e.message));
+    channel.on('close', () => { if (ch === channel) ch = null; scheduleReconnect(); });
+    await setupChannel(channel);
+    ch = channel;
+    console.log('🐰 Conectado a RabbitMQ');
+    if (players.size) await rebindPlayers(channel);
+  } catch (e) {
+    console.error('No se pudo conectar a RabbitMQ:', e.message);
+    scheduleReconnect();
+  }
+}
+
+async function main() {
   const app    = express();
   app.use(express.static(path.join(__dirname, 'public')));
   const server = http.createServer(app);
@@ -211,27 +268,28 @@ async function main() {
           if (players.size + joining >= MAX_PLAYERS) {
             send(ws, { type: 'lleno' }); ws.close(); return;
           }
+          if (!ch) {
+            send(ws, { type: 'aviso', text: 'Servidor reconectando, reintenta en unos segundos' });
+            ws.close(); return;
+          }
           joining++;
           const name = String(msg.name || '').trim().slice(0, 16) || 'Jugador' + Math.floor(Math.random() * 100);
-          const { queue } = await ch.assertQueue('', { exclusive: true, autoDelete: true });
+          const channel = ch;
+          const { queue } = await channel.assertQueue('', { exclusive: true, autoDelete: true });
           p = { name, queue, zones: new Set(Object.keys(ZONES)), combo: 0, lastHit: 0 };
-          for (const zone of Object.keys(ZONES)) await ch.bindQueue(queue, 'monstruos', zone);
+          await Promise.all([...p.zones].map((z) => channel.bindQueue(queue, 'monstruos', z)));
           players.set(ws, p);
           joining = Math.max(0, joining - 1);
           if (!scores.has(name)) scores.set(name, 0);
           if (!hits.has(name))   hits.set(name, 0);
-          const { consumerTag } = await ch.consume(queue, (m) => {
-            if (!m) return;
-            ch.ack(m);
-            send(ws, { type: 'monstruo', monster: JSON.parse(m.content.toString()) });
-          });
+          const { consumerTag } = await consumePlayer(channel, ws, queue);
           p.tag = consumerTag;
           send(ws, { type: 'bienvenida', name, queue, zones: [...p.zones], ranking: ranking(), maxPlayers: MAX_PLAYERS });
           broadcast({ type: 'aviso', text: `${name} se unió (${players.size}/${MAX_PLAYERS})` });
           broadcastState();
           scheduleLobby();
 
-        } else if (p && msg.type === 'zona' && ZONES[msg.zone]) {
+        } else if (p && msg.type === 'zona' && ZONES[msg.zone] && ch) {
           if (msg.on) { await ch.bindQueue(p.queue, 'monstruos', msg.zone);   p.zones.add(msg.zone); }
           else        { await ch.unbindQueue(p.queue, 'monstruos', msg.zone); p.zones.delete(msg.zone); }
           send(ws, { type: 'zonas', zones: [...p.zones], queue: p.queue });
@@ -241,7 +299,7 @@ async function main() {
 
         } else if (p && msg.type === 'golpe') {
           const id = Number(msg.id);
-          if (!Number.isFinite(id)) return;
+          if (!Number.isFinite(id) || !ch) return;
           const y = Number(msg.y);
           ch.publish('acciones', 'golpe', Buffer.from(JSON.stringify({ id, player: p.name, y: Number.isFinite(y) ? y : 1 })));
         }
@@ -254,7 +312,7 @@ async function main() {
     ws.on('close', async () => {
       if (!p) { joining = Math.max(0, joining - 1); return; }
       players.delete(ws);
-      try { await ch.cancel(p.tag); } catch {}
+      if (ch && p.tag) { try { await ch.cancel(p.tag); } catch {} }
       broadcast({ type: 'aviso', text: `${p.name} salió de la partida` });
       broadcastState();
       if (players.size === 0) resetToLobby();
@@ -263,6 +321,7 @@ async function main() {
   });
 
   server.listen(PORT, () => console.log(`🎮 Servidor en http://localhost:${PORT}`));
+  connectRabbit();
 }
 
-main().catch((e) => { console.error('No se pudo conectar a RabbitMQ:', e.message); process.exit(1); });
+main().catch((e) => { console.error('Error fatal:', e.message); process.exit(1); });

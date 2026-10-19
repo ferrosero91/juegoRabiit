@@ -31,6 +31,13 @@ npm install
 npm start                       # http://localhost:3000
 ```
 
+### Robustez
+
+- Reconexión automática a RabbitMQ con reintento cada 3s; al volver, recrea el
+  exchange/colas y re-vincula las colas de cada jugador (no se pierde la partida).
+- Los timers de expiración de monstruos se limpian al terminar la partida.
+- Soportado hasta `MAX_PLAYERS = 8` jugadores simultáneos.
+
 Variables de entorno:
 
 | Variable   | Por defecto                          |
