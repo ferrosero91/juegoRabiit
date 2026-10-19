@@ -7,6 +7,17 @@ Juego multijugador de cacería (3 zonas: bosque, cueva y volcán) usando **Node.
 - **app**: Node.js (Express + `ws`) sirve el cliente y gestiona la partida.
 - **rabbitmq**: `rabbitmq:3-management`, exchange `direct` `monstruos` y colas por zona.
 
+## Cómo usa RabbitMQ (el ejercicio)
+
+- `monstruos` (**direct**): cada monstruo se publica con **routing key = zona**
+  (`bosque` / `cueva` / `volcan`). Cada jugador tiene una **cola exclusiva** enlazada a
+  las zonas que tiene activas, así que **solo recibe los monstruos de sus zonas**
+  (desactivar una zona desenlaza esa routing key). Los monstruos viajan **por RabbitMQ**,
+  no por WebSocket directo.
+- `acciones` (**direct**): cada golpe se publica con routing key `golpe` a la cola
+  `golpes`, consumida por el servidor. `first-arrive-wins`: el golpe que llega primero
+  al exchange es el que mata al monstruo.
+
 ## Ejecución local (Docker)
 
 El compose usa la red externa `dokploy-network` (la que usa Traefik en Dokploy).

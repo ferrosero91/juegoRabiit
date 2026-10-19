@@ -113,6 +113,7 @@ function monsterTTL() {
 
 function spawnMonster() {
   if (phase !== 'playing') return;
+  if (!ch) { spawnTimer = setTimeout(spawnMonster, spawnInterval()); return; }
   const keys = Object.keys(ZONES);
   const zone = keys[Math.floor(Math.random() * keys.length)];
   const base = ZONES[zone][Math.floor(Math.random() * ZONES[zone].length)];
@@ -125,13 +126,15 @@ function spawnMonster() {
       alive.delete(monster.id);
       const damage = Math.max(3, Math.round(6 * (monster.size || 1)));
       health = Math.max(0, health - damage);
-      broadcast({ type: 'escapo', id: monster.id, damage, health, maxHealth: MAX_HEALTH });
+      publishZona(zone, { type: 'escapo', id: monster.id, damage, health, maxHealth: MAX_HEALTH });
       if (health <= 0) { endMatch('derrota'); return; }
       broadcastState();
     }
   }, ttl + 300);
   ttlTimers.add(ttlTimer);
-  broadcast({ type: 'monstruo', monster });
+  // Los monstruos viajan por el exchange 'monstruos' con routing key = zona.
+  // Solo los jugadores con su cola enlazada a esa zona lo reciben.
+  publishZona(zone, { type: 'monstruo', monster });
   spawnTimer = setTimeout(spawnMonster, spawnInterval());
 }
 
@@ -211,8 +214,15 @@ function consumePlayer(channel, ws, queue) {
   return channel.consume(queue, (m) => {
     if (!m) return;
     try { channel.ack(m); } catch {}
-    send(ws, { type: 'monstruo', monster: JSON.parse(m.content.toString()) });
+    let data; try { data = JSON.parse(m.content.toString()); } catch { return; }
+    send(ws, data.type ? data : { type: 'monstruo', monster: data });
   });
+}
+
+function publishZona(zone, payload) {
+  if (!ch) return false;
+  try { return ch.publish('monstruos', zone, Buffer.from(JSON.stringify(payload))); }
+  catch (e) { console.error('publishZona:', e.message); return false; }
 }
 
 async function setupChannel(channel) {
