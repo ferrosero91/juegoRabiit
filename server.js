@@ -8,9 +8,11 @@ const AMQP_URL = process.env.AMQP_URL || 'amqp://guest:guest@localhost:5672';
 const PORT = process.env.PORT || 3000;
 const MAX_PLAYERS = 8;
 const MATCH_MS = 60000;
+const MIN_MATCH_MS = 15000;
+const MAX_MATCH_MS = 300000;
 const COUNTDOWN_MS = 3000;
-const LOBBY_SOLO_MS = 4000;
-const LOBBY_MULTI_MS = 2000;
+const RESULTS_MS = 8000;
+const LOBBY_NEXT_MS = 4000;
 const COMBO_WINDOW_MS = 3000;
 const MAX_HEALTH = 100;
 
@@ -43,6 +45,9 @@ const hits = new Map();
 let nextId = 1;
 let ch = null;
 let reconnectTimer = null;
+let roomCapacity = MAX_PLAYERS;
+let matchMs = MATCH_MS;
+let autoRounds = false;
 
 let phase = 'lobby';
 let health = MAX_HEALTH;
@@ -58,7 +63,8 @@ const send = (ws, msg) => ws.readyState === 1 && ws.send(JSON.stringify(msg));
 const broadcast = (msg) => players.forEach((_, ws) => send(ws, msg));
 const ranking = () =>
   [...scores].map(([name, points]) => ({ name, points, hits: hits.get(name) || 0 }))
-    .sort((a, b) => b.points - a.points || b.hits - a.hits).slice(0, MAX_PLAYERS);
+    .sort((a, b) => b.points - a.points || b.hits - a.hits).slice(0, roomCapacity);
+const hostOf = () => { const it = players.values().next(); return it.done ? null : it.value; };
 
 function clearTimers() {
   if (spawnTimer)    { clearTimeout(spawnTimer);    spawnTimer    = null; }
@@ -71,18 +77,17 @@ function clearTimers() {
 }
 
 function broadcastState() {
-  const timeLeft = phase === 'playing' ? Math.max(0, MATCH_MS - (Date.now() - matchStart)) : 0;
-  broadcast({ type: 'estado', phase, players: players.size, maxPlayers: MAX_PLAYERS, timeLeft, health, maxHealth: MAX_HEALTH, ranking: ranking() });
+  const timeLeft = phase === 'playing' ? Math.max(0, matchMs - (Date.now() - matchStart)) : 0;
+  const host = hostOf();
+  broadcast({ type: 'estado', phase, players: players.size, maxPlayers: roomCapacity, duration: matchMs, host: host ? host.name : null, timeLeft, health, maxHealth: MAX_HEALTH, ranking: ranking() });
 }
 
 function scheduleLobby() {
   if (phase !== 'lobby') return;
-  if (lobbyTimer) clearTimeout(lobbyTimer);
-  if (players.size === 0) return;
-  const delay = players.size >= 2 ? LOBBY_MULTI_MS : LOBBY_SOLO_MS;
-  lobbyTimer = setTimeout(() => {
-    if (phase === 'lobby' && players.size >= 1) startCountdown();
-  }, delay);
+  if (lobbyTimer) { clearTimeout(lobbyTimer); lobbyTimer = null; }
+  if (players.size === 0) { autoRounds = false; return; }
+  if (players.size >= roomCapacity) { startCountdown(); return; }
+  if (autoRounds) lobbyTimer = setTimeout(() => { if (phase === 'lobby' && players.size > 0) startCountdown(); }, LOBBY_NEXT_MS);
 }
 
 function startCountdown() {
@@ -95,11 +100,11 @@ function startCountdown() {
 }
 
 function spawnInterval() {
-  const t = Math.min(1, (Date.now() - matchStart) / MATCH_MS);
+  const t = Math.min(1, (Date.now() - matchStart) / matchMs);
   return Math.round(2200 - 1000 * t);
 }
 function monsterTTL() {
-  const t = Math.min(1, (Date.now() - matchStart) / MATCH_MS);
+  const t = Math.min(1, (Date.now() - matchStart) / matchMs);
   return Math.round(8000 - 3000 * t);
 }
 
@@ -135,10 +140,10 @@ function startMatch() {
   scores.forEach((_, name) => scores.set(name, 0));
   hits.forEach((_, name)   => hits.set(name, 0));
   clearTimers();
-  broadcast({ type: 'inicio', duration: MATCH_MS });
+  broadcast({ type: 'inicio', duration: matchMs });
   broadcastState();
   spawnMonster();
-  endTimer   = setTimeout(endMatch, MATCH_MS);
+  endTimer   = setTimeout(endMatch, matchMs);
   tickTimer  = setInterval(broadcastState, 1000);
 }
 
@@ -149,16 +154,21 @@ function endMatch(reason = 'tiempo') {
   alive.clear();
   broadcast({ type: 'fin', reason, health, maxHealth: MAX_HEALTH, ranking: ranking() });
   broadcastState();
-  setTimeout(resetToLobby, 12000);
+  endTimer = setTimeout(resetToLobby, RESULTS_MS);
 }
 
 function resetToLobby() {
   phase = 'lobby';
   alive.clear();
   clearTimers();
+  health = MAX_HEALTH;
   scores.forEach((_, name) => scores.set(name, 0));
   hits.forEach((_, name)   => hits.set(name, 0));
   broadcastState();
+  if (players.size > 0) {
+    autoRounds = true;
+    broadcast({ type: 'aviso', text: 'Nueva ronda en unos segundos…' });
+  }
   scheduleLobby();
 }
 
@@ -269,8 +279,8 @@ async function main() {
       try { msg = JSON.parse(raw); } catch { return; }
       try {
         if (msg.type === 'unirse' && !p) {
-          if (players.size + joining >= MAX_PLAYERS) {
-            send(ws, { type: 'lleno' }); ws.close(); return;
+          if (players.size + joining >= roomCapacity) {
+            send(ws, { type: 'lleno', maxPlayers: roomCapacity }); ws.close(); return;
           }
           if (!ch) {
             send(ws, { type: 'aviso', text: 'Servidor reconectando, reintenta en unos segundos' });
@@ -288,10 +298,41 @@ async function main() {
           if (!hits.has(name))   hits.set(name, 0);
           const { consumerTag } = await consumePlayer(channel, ws, queue);
           p.tag = consumerTag;
-          send(ws, { type: 'bienvenida', name, queue, zones: [...p.zones], ranking: ranking(), maxPlayers: MAX_PLAYERS });
-          broadcast({ type: 'aviso', text: `${name} se unió (${players.size}/${MAX_PLAYERS})` });
+          const host = hostOf();
+          send(ws, { type: 'bienvenida', name, queue, zones: [...p.zones], ranking: ranking(), maxPlayers: roomCapacity, duration: matchMs, host: host ? host.name : name, isHost: host === p });
+          broadcast({ type: 'aviso', text: `${name} se unió (${players.size}/${roomCapacity})` });
           broadcastState();
           scheduleLobby();
+
+        } else if (p && msg.type === 'config') {
+          if (p !== hostOf()) { send(ws, { type: 'aviso', text: 'Solo el anfitrión puede cambiar la configuración' }); return; }
+          let changed = false;
+          if (msg.capacity !== undefined) {
+            const cap = Math.floor(Number(msg.capacity));
+            if (Number.isFinite(cap)) {
+              roomCapacity = Math.min(MAX_PLAYERS, Math.max(2, cap));
+              changed = true;
+              if (players.size > roomCapacity) {
+                const keep = new Set([...players.keys()].slice(0, roomCapacity));
+                for (const [kws, kp] of [...players]) {
+                  if (keep.has(kws)) continue;
+                  players.delete(kws);
+                  if (ch && kp.tag) { try { ch.cancel(kp.tag); } catch {} }
+                  send(kws, { type: 'lleno', maxPlayers: roomCapacity });
+                  kws.close();
+                }
+              }
+            }
+          }
+          if (msg.matchSeconds !== undefined) {
+            const sec = Math.floor(Number(msg.matchSeconds));
+            if (Number.isFinite(sec)) { matchMs = Math.min(MAX_MATCH_MS, Math.max(MIN_MATCH_MS, sec * 1000)); changed = true; }
+          }
+          if (changed) {
+            broadcast({ type: 'aviso', text: `Sala: ${roomCapacity} jugadores · ${Math.round(matchMs / 1000)}s` });
+            broadcastState();
+            scheduleLobby();
+          }
 
         } else if (p && msg.type === 'zona' && ZONES[msg.zone] && ch) {
           if (msg.on) { await ch.bindQueue(p.queue, 'monstruos', msg.zone);   p.zones.add(msg.zone); }

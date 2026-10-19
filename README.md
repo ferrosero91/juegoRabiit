@@ -38,6 +38,17 @@ npm start                       # http://localhost:3000
 - Los timers de expiración de monstruos se limpian al terminar la partida.
 - Soportado hasta `MAX_PLAYERS = 8` jugadores simultáneos.
 
+### Configuración de sala (anfitrión)
+
+El primer jugador que entra es el **anfitrión**. Desde la sala de espera puede elegir:
+
+- **Capacidad**: 2–8 jugadores (los demás quedan bloqueados si está llena).
+- **Duración**: 30 s a 5 min.
+
+La partida arranca con el botón o automáticamente al llenarse. Al terminar, se
+muestran los resultados y, tras unos segundos, **se reinicia sola una nueva ronda**
+con todos los datos limpios (puntos, monstruos, marcadores) para los conectados.
+
 Variables de entorno:
 
 | Variable   | Por defecto                          |
