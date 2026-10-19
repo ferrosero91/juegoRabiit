@@ -274,7 +274,57 @@ body.crit::after{box-shadow:inset 0 0 220px 90px #b3001b99,inset 0 0 60px 24px #
 .flicker-glitch{animation:glitchfx .28s steps(2) 1}
 @keyframes glitchfx{0%{filter:none}25%{filter:hue-rotate(20deg) saturate(1.6) contrast(1.3)}50%{transform:translateX(2px);filter:invert(.08)}75%{filter:hue-rotate(-15deg)}100%{filter:none}}
 [hidden]{display:none!important}
-@media(max-width:900px){main{grid-template-columns:1fr;padding:12px}.arena{grid-template-columns:1fr}.field{height:420px}#toasts{top:12px;bottom:auto;right:12px}}
+.arena{touch-action:manipulation}
+@media(max-width:1024px){main{grid-template-columns:1fr;padding:12px}.arena{grid-template-columns:1fr;gap:12px}aside{order:2}}
+@media(max-width:900px){
+  header{padding:10px 12px;gap:8px}
+  h1{font-size:1.8rem;letter-spacing:2px}
+  .hud{width:100%;justify-content:center;flex-wrap:wrap;gap:8px;font-size:.78rem}
+  .hud .chip{padding:5px 9px}
+  #fireBtn{flex:1 1 auto;min-width:140px}
+  .camp-hp{max-width:100%}
+  .field{height:clamp(300px,50vh,460px)}
+  #toasts{top:auto;bottom:12px;right:12px;left:12px;max-width:none}
+  .big-cannon{width:220px;height:174px;bottom:-24px}
+  .big-cannon .gunner{width:150px;bottom:20px}
+  .big-cannon .barrel{width:42px;height:128px;margin-left:-21px;bottom:64px}
+  .big-cannon .wheel{width:52px;height:52px}
+  .big-cannon .wheel::after{inset:16px}
+  .big-cannon .base{width:158px;height:60px}
+  .big-cannon .mount{width:72px;height:38px;bottom:52px}
+  .big-cannon .crest{font-size:24px;bottom:22px}
+  .big-cannon .brake{width:56px;height:26px}
+  .muzzle-light{width:240px;height:240px}
+}
+@media(max-width:560px){
+  h1{font-size:1.45rem}
+  .subtitle{font-size:.82rem}
+  .field{height:clamp(260px,46vh,380px)}
+  .lane-head{font-size:1rem;padding:9px 10px;letter-spacing:2px}
+  .hud .chip{font-size:.68rem;padding:4px 7px}
+  #timer{font-size:1.05rem}
+  .big-cannon{width:168px;height:140px;bottom:-18px}
+  .big-cannon .gunner{width:118px;bottom:16px}
+  .big-cannon .barrel{width:34px;height:100px;margin-left:-17px;bottom:52px}
+  .big-cannon .wheel{width:42px;height:42px}
+  .big-cannon .base{width:124px;height:48px}
+  .big-cannon .mount{width:58px;height:30px;bottom:42px}
+  .big-cannon .crest{font-size:19px;bottom:18px}
+  .big-cannon .brake{width:46px;height:22px}
+  .big-cannon .brake span{height:12px;width:7px}
+  #combo{font-size:1.3rem;left:12px;bottom:12px}
+  .overlay h2{font-size:1.8rem}
+  .overlay .big{font-size:2.4rem}
+  .emblem{height:180px}
+  .skull-svg{width:150px}
+  #login h1{font-size:2.4rem}
+  #login form{padding:26px 20px}
+}
+@media(hover:none){
+  .crosshair{display:none!important}
+  .mon .ico{font-size:3rem}
+  .lane-head{cursor:default}
+}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -487,7 +537,7 @@ arena.append(aimLine, muzzleLight);
 
 // Global aim + fire over the whole arena
 let aimAngle = -90;
-arena.addEventListener('mousemove', (ev) => {
+arena.addEventListener('pointermove', (ev) => {
   const rect = arena.getBoundingClientRect();
   const mx = ev.clientX - rect.left;
   const my = ev.clientY - rect.top;
@@ -1170,7 +1220,7 @@ function updateHUD(){
 function handle(m){
   if (m.type === 'bienvenida') {
     me = m.name; queueName = m.queue; myScore = 0;
-    if (m.zones) listening = new Set(m.zones);
+    listening = new Set(m.zones && m.zones.length ? m.zones : Object.keys(ZONES));
     $('#login').hidden = true;
     $('#status').textContent = 'Jugando como ' + me;
     renderRanking(m.ranking); renderLanes(); updateHUD();

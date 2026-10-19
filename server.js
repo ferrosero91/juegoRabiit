@@ -253,7 +253,11 @@ async function connectRabbit() {
 
 async function main() {
   const app    = express();
-  app.use(express.static(path.join(__dirname, 'public')));
+  app.use(express.static(path.join(__dirname, 'public'), {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    },
+  }));
   const server = http.createServer(app);
   const wss    = new WebSocketServer({ server });
 
